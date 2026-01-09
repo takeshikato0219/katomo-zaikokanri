@@ -14,6 +14,9 @@ import {
   Cloud,
   Table,
   Smartphone,
+  LogOut,
+  User,
+  History,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { Page } from '../types';
@@ -21,6 +24,8 @@ import type { Page } from '../types';
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
+  userName?: string;
+  onLogout?: () => void;
 }
 
 const navItems: { page: Page; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -31,6 +36,7 @@ const navItems: { page: Page; label: string; icon: React.ComponentType<{ classNa
   { page: 'mobile-receipt', label: '入荷（スマホ）', icon: Smartphone },
   { page: 'usage', label: '使用', icon: PackageMinus },
   { page: 'mobile-usage', label: '使用（スマホ）', icon: Smartphone },
+  { page: 'receipt-stock-history', label: '入荷在庫履歴', icon: History },
   { page: 'customers', label: '顧客', icon: Users },
   { page: 'monthly-summary', label: '月次集計', icon: Calendar },
   { page: 'orders', label: '発注', icon: ShoppingCart },
@@ -39,7 +45,7 @@ const navItems: { page: Page; label: string; icon: React.ComponentType<{ classNa
   { page: 'import-export', label: 'CSV', icon: FileSpreadsheet },
 ];
 
-export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, userName, onLogout }: SidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -78,6 +84,15 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        {/* User Info - Mobile */}
+        {userName && (
+          <div className="px-4 py-3 border-b border-[#e5e5e5] bg-[#f3f3f3]">
+            <div className="flex items-center space-x-2">
+              <User className="w-4 h-4 text-[#706e6b]" />
+              <span className="text-sm font-medium text-[#181818]">{userName}</span>
+            </div>
+          </div>
+        )}
         <nav className="p-2 overflow-y-auto h-full">
           <ul className="space-y-0.5">
             {navItems.map(({ page, label, icon: Icon }) => (
@@ -98,6 +113,21 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
                 </button>
               </li>
             ))}
+            {/* Logout Button - Mobile */}
+            {onLogout && (
+              <li className="pt-2 border-t border-[#e5e5e5] mt-2">
+                <button
+                  onClick={() => {
+                    onLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center space-x-3 w-full px-3 py-2 rounded text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>ログアウト</span>
+                </button>
+              </li>
+            )}
           </ul>
         </nav>
       </aside>
@@ -146,9 +176,23 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Footer */}
-        <div className="p-3 border-t border-[#e5e5e5] text-xs text-[#706e6b]">
-          <div>Powered by Lightning</div>
+        {/* User Info & Logout - Desktop */}
+        <div className="p-3 border-t border-[#e5e5e5]">
+          {userName && (
+            <div className="flex items-center space-x-2 mb-2 px-1">
+              <User className="w-4 h-4 text-[#706e6b]" />
+              <span className="text-sm text-[#181818]">{userName}</span>
+            </div>
+          )}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex items-center space-x-2 w-full px-3 py-2 rounded text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>ログアウト</span>
+            </button>
+          )}
         </div>
       </aside>
     </>

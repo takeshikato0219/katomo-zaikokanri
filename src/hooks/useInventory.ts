@@ -62,6 +62,17 @@ export function useInventory() {
     );
   }, [setProducts]);
 
+  // 複数商品を一括更新
+  const updateProducts = useCallback((updates: { productId: string; updates: Partial<Product> }[]) => {
+    setProducts((prev) => {
+      const updateMap = new Map(updates.map((u) => [u.productId, u.updates]));
+      return prev.map((p) => {
+        const productUpdates = updateMap.get(p.id);
+        return productUpdates ? { ...p, ...productUpdates } : p;
+      });
+    });
+  }, [setProducts]);
+
   const deleteProduct = useCallback((productId: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== productId));
     setStocks((prev) => prev.filter((s) => s.productId !== productId));
@@ -475,6 +486,7 @@ export function useInventory() {
     // 商品
     addProduct,
     updateProduct,
+    updateProducts,
     deleteProduct,
     getProductById,
     getProductsBySupplier,

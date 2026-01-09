@@ -149,6 +149,13 @@ export interface QRCodeData {
   supplierName: string;
 }
 
+// ユーザー（ログイン用）
+export interface User {
+  username: string;
+  password: string;
+  displayName: string;
+}
+
 // ナビゲーションページ
 export type Page =
   | 'dashboard'
@@ -165,7 +172,8 @@ export type Page =
   | 'receipt'
   | 'usage'
   | 'mobile-receipt'
-  | 'mobile-usage';
+  | 'mobile-usage'
+  | 'receipt-stock-history';
 
 // ===== AI関連型定義 =====
 

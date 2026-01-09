@@ -1,7 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { ChevronRight, Calendar, Table } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { ChevronRight, Calendar, Table, Edit3, Save, X, FileText } from 'lucide-react';
 import { useInventory } from '../hooks/useInventory';
 import { formatCurrency, formatNumber } from '../utils/calculations';
+import { PurchaseOrderModal } from './PurchaseOrderModal';
+import type { Product } from '../types';
+
+// 編集中のデータ型
+type EditableFields = Pick<Product, 'idealStock' | 'minStock'>;
+type EditData = Map<string, Partial<EditableFields>>;
 
 // 週の開始日を取得（月曜日始まり）
 function getWeekStart(date: Date): Date {
@@ -51,6 +57,7 @@ export function InventoryTable() {
     customers,
     transactions,
     getStock,
+    updateProducts,
   } = useInventory();
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -60,6 +67,58 @@ export function InventoryTable() {
 
   const [viewMode, setViewMode] = useState<'weekly' | 'daily'>('weekly');
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+
+  // 編集モード
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editData, setEditData] = useState<EditData>(new Map());
+
+  // 編集モード開始
+  const handleStartEdit = useCallback(() => {
+    setIsEditMode(true);
+    setEditData(new Map());
+  }, []);
+
+  // 編集モードキャンセル
+  const handleCancelEdit = useCallback(() => {
+    setIsEditMode(false);
+    setEditData(new Map());
+  }, []);
+
+  // セルの値を更新
+  const handleEditChange = useCallback((productId: string, field: keyof EditableFields, value: number | undefined) => {
+    setEditData((prev) => {
+      const newMap = new Map(prev);
+      const existing = newMap.get(productId) || {};
+      newMap.set(productId, { ...existing, [field]: value });
+      return newMap;
+    });
+  }, []);
+
+  // 一括保存
+  const handleSave = useCallback(() => {
+    const updates = Array.from(editData.entries())
+      .filter(([, changes]) => Object.keys(changes).length > 0)
+      .map(([productId, changes]) => ({
+        productId,
+        updates: changes,
+      }));
+
+    if (updates.length > 0) {
+      updateProducts(updates);
+    }
+
+    setIsEditMode(false);
+    setEditData(new Map());
+  }, [editData, updateProducts]);
+
+  // 編集中の値を取得（編集中は編集データ、そうでなければ元の値）
+  const getEditValue = useCallback((productId: string, field: keyof EditableFields, originalValue: number | undefined) => {
+    const edits = editData.get(productId);
+    if (edits && field in edits) {
+      return edits[field];
+    }
+    return originalValue;
+  }, [editData]);
 
   const [year, month] = selectedMonth.split('-').map(Number);
   const weeks = useMemo(() => getWeeksInMonth(year, month), [year, month]);
@@ -278,6 +337,37 @@ export function InventoryTable() {
     return totals;
   }, [productData]);
 
+  // 発注書モーダル用のstate
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [selectedSupplierForOrder, setSelectedSupplierForOrder] = useState<{
+    supplierId: string;
+    supplierName: string;
+  } | null>(null);
+
+  // 業者ごとの発注対象商品を取得
+  const getOrderItemsForSupplier = useCallback((supplierId: string) => {
+    return productData
+      .filter((p) => p.product.supplierId === supplierId && p.shortage > 0)
+      .map((p) => ({
+        product: p.product,
+        currentStock: p.currentStock,
+        shortage: p.shortage,
+        orderQuantity: p.shortage, // 初期値は不足数
+      }));
+  }, [productData]);
+
+  // 発注書発行ボタンクリック
+  const handleOpenOrderModal = useCallback((supplierId: string, supplierName: string) => {
+    setSelectedSupplierForOrder({ supplierId, supplierName });
+    setOrderModalOpen(true);
+  }, []);
+
+  // 発注確定処理（必要に応じて発注履歴への保存などを追加可能）
+  const handleConfirmOrder = useCallback((items: { product: Product; orderQuantity: number }[]) => {
+    // TODO: 発注履歴への保存処理を追加
+    console.log('発注確定:', items);
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* ヘッダー */}
@@ -313,6 +403,33 @@ export function InventoryTable() {
                 日別
               </button>
             </div>
+            {/* 編集モードボタン */}
+            {isEditMode ? (
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleSave}
+                  className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-[#2e844a] text-white rounded hover:bg-[#236b3a] transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>保存</span>
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-[#706e6b] text-white rounded hover:bg-[#5c5a58] transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  <span>キャンセル</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleStartEdit}
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-[#0176d3] text-white rounded hover:bg-[#015ba5] transition-colors"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>編集モード</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -323,12 +440,12 @@ export function InventoryTable() {
           <table className="w-full text-xs border-collapse whitespace-nowrap">
             <thead className="bg-[#fafaf9] sticky top-0 z-10">
               <tr className="border-b border-[#e5e5e5]">
-                {/* 基本情報 */}
-                <th className="sticky left-0 z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold min-w-[120px]">品名</th>
-                <th className="border-r border-[#e5e5e5] px-2 py-2 text-left font-bold min-w-[70px]">業者</th>
-                <th className="border-r border-[#e5e5e5] px-2 py-2 text-right font-bold min-w-[50px]">当月棚卸</th>
-                <th className="border-r border-[#e5e5e5] px-2 py-2 text-right font-bold min-w-[70px]">合計金額</th>
-                <th className="border-r border-[#e5e5e5] px-2 py-2 text-right font-bold min-w-[60px]">標単価</th>
+                {/* 基本情報 - 固定列 */}
+                <th className="sticky left-0 z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold w-[120px] min-w-[120px]">品名</th>
+                <th className="sticky left-[120px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold w-[80px] min-w-[80px]">業者</th>
+                <th className="sticky left-[200px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[60px] min-w-[60px]">当月棚卸</th>
+                <th className="sticky left-[260px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[70px] min-w-[70px]">合計金額</th>
+                <th className="sticky left-[330px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">標単価</th>
 
                 {/* 週別/日別カラム */}
                 {weeks.map((week) => {
@@ -420,9 +537,12 @@ export function InventoryTable() {
                 <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[70px] bg-[#2e844a]/20">在庫金額合計</th>
                 <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[50px] bg-[#fafaf9]">当月棚卸</th>
                 <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[70px] bg-[#fafaf9]">在庫金額合計</th>
+                <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[55px] bg-[#0176d3]/10">理想在庫</th>
+                <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[55px] bg-[#0176d3]/10">補充トリガー</th>
                 <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[40px] bg-[#c23934]/10">差</th>
                 <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[45px] bg-[#c23934]/20">発注数</th>
                 <th className="border-r border-[#e5e5e5] px-1 py-2 text-right font-bold min-w-[60px] bg-[#c23934]/20">発注金額</th>
+                <th className="border-r border-[#e5e5e5] px-1 py-2 text-center font-bold min-w-[80px] bg-[#c23934]/30">発注書</th>
               </tr>
             </thead>
             <tbody>
@@ -439,7 +559,7 @@ export function InventoryTable() {
                   const isExpanded = expandedWeeks.has(week.label) || viewMode === 'daily';
                   return sum + (isExpanded ? week.days.length : 1);
                 }, 0);
-                const fixedColumns = 24; // 仕入集計〜発注金額
+                const fixedColumns = 25; // 仕入集計〜発注金額 + 発注書
                 const customerColumns = customers.length * 2; // 顧客別使用数 + 使用金額
                 const totalColumns = baseColumns + weekColumns + fixedColumns + customerColumns;
 
@@ -473,11 +593,11 @@ export function InventoryTable() {
                     <tr
                       className={`border-b border-[#e5e5e5] hover:bg-[#f3f3f3] ${isLowStock ? 'bg-[#feded8]/10' : ''}`}
                     >
-                    <td className="sticky left-0 z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 font-medium">{data.product.name}</td>
-                    <td className="border-r border-[#e5e5e5] px-2 py-1 text-[#706e6b]">{data.supplierName}</td>
-                    <td className="border-r border-[#e5e5e5] px-2 py-1 text-right">{data.prevMonthStock}</td>
-                    <td className="border-r border-[#e5e5e5] px-2 py-1 text-right">{formatCurrency(data.totalAmount)}</td>
-                    <td className="border-r border-[#e5e5e5] px-2 py-1 text-right">{formatCurrency(data.product.unitPrice)}</td>
+                    <td className="sticky left-0 z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 font-medium w-[120px] min-w-[120px]">{data.product.name}</td>
+                    <td className="sticky left-[120px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-[#706e6b] w-[80px] min-w-[80px]">{data.supplierName}</td>
+                    <td className="sticky left-[200px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-right w-[60px] min-w-[60px]">{data.prevMonthStock}</td>
+                    <td className="sticky left-[260px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-right w-[70px] min-w-[70px]">{formatCurrency(data.totalAmount)}</td>
+                    <td className="sticky left-[330px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-right w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{formatCurrency(data.product.unitPrice)}</td>
 
                     {/* 週別/日別データ */}
                     {data.weeklyData.map((weekData) => {
@@ -564,18 +684,56 @@ export function InventoryTable() {
                     <td className="border-r border-[#e5e5e5] px-1 py-1 text-right bg-[#2e844a]/10">{formatCurrency(data.thisMonthBalance * data.product.unitPrice)}</td>
                     <td className="border-r border-[#e5e5e5] px-1 py-1 text-right">{data.currentStock}</td>
                     <td className="border-r border-[#e5e5e5] px-1 py-1 text-right">{formatCurrency(data.totalAmount)}</td>
+                    <td className="border-r border-[#e5e5e5] px-1 py-1 text-right bg-[#0176d3]/5">
+                      {isEditMode ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={getEditValue(data.product.id, 'idealStock', data.product.idealStock) ?? ''}
+                          onChange={(e) => handleEditChange(data.product.id, 'idealStock', e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-14 px-1 py-0.5 text-right text-xs border border-[#0176d3] rounded focus:outline-none focus:ring-1 focus:ring-[#0176d3]"
+                          placeholder="-"
+                        />
+                      ) : (
+                        data.product.idealStock ?? '-'
+                      )}
+                    </td>
+                    <td className={`border-r border-[#e5e5e5] px-1 py-1 text-right bg-[#0176d3]/5 ${!isEditMode && data.currentStock <= data.product.minStock ? 'text-[#c23934] font-bold' : ''}`}>
+                      {isEditMode ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={getEditValue(data.product.id, 'minStock', data.product.minStock) ?? ''}
+                          onChange={(e) => handleEditChange(data.product.id, 'minStock', e.target.value ? Number(e.target.value) : 0)}
+                          className="w-14 px-1 py-0.5 text-right text-xs border border-[#0176d3] rounded focus:outline-none focus:ring-1 focus:ring-[#0176d3]"
+                        />
+                      ) : (
+                        data.product.minStock
+                      )}
+                    </td>
                     <td className={`border-r border-[#e5e5e5] px-1 py-1 text-right ${data.diff !== 0 ? 'text-[#c23934] font-bold' : ''}`}>{data.diff !== 0 ? data.diff : '-'}</td>
                     <td className="border-r border-[#e5e5e5] px-1 py-1 text-right bg-[#c23934]/10">{data.shortage || '-'}</td>
                     <td className="border-r border-[#e5e5e5] px-1 py-1 text-right bg-[#c23934]/10">{data.orderAmount > 0 ? formatCurrency(data.orderAmount) : '-'}</td>
+                    <td className="border-r border-[#e5e5e5] px-1 py-1 text-center bg-[#c23934]/5"></td>
                     </tr>
                     {/* 業者の最後の商品の後に合計行を表示 */}
                     {isLastOfSupplier && (
                       <tr className="bg-[#f0f7ff] border-b-2 border-[#0176d3]">
-                        <td colSpan={totalColumns - 1} className="px-3 py-2 text-right text-sm font-medium text-[#706e6b]">
+                        <td colSpan={totalColumns - 2} className="px-3 py-2 text-right text-sm font-medium text-[#706e6b]">
                           {data.supplierName} 合計
                         </td>
                         <td className="px-3 py-2 text-right text-sm font-bold text-[#0176d3]">
                           {formatCurrency(supplierTotals.get(data.product.supplierId) || 0)}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => handleOpenOrderModal(data.product.supplierId, data.supplierName)}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs bg-[#c23934] text-white rounded hover:bg-[#a82e2a] transition-colors"
+                            title="発注書を発行"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>発注書発行</span>
+                          </button>
                         </td>
                       </tr>
                     )}
@@ -585,11 +743,11 @@ export function InventoryTable() {
             </tbody>
             <tfoot className="bg-[#fafaf9] font-bold">
               <tr className="border-t-2 border-[#e5e5e5]">
-                <td className="sticky left-0 z-10 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2">合計</td>
-                <td className="border-r border-[#e5e5e5] px-2 py-2"></td>
-                <td className="border-r border-[#e5e5e5] px-2 py-2 text-right">{formatNumber(totals.prevMonthStock)}</td>
-                <td className="border-r border-[#e5e5e5] px-2 py-2 text-right">{formatCurrency(totals.totalAmount)}</td>
-                <td className="border-r border-[#e5e5e5] px-2 py-2"></td>
+                <td className="sticky left-0 z-10 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 w-[120px] min-w-[120px]">合計</td>
+                <td className="sticky left-[120px] z-10 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 w-[80px] min-w-[80px]"></td>
+                <td className="sticky left-[200px] z-10 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right w-[60px] min-w-[60px]">{formatNumber(totals.prevMonthStock)}</td>
+                <td className="sticky left-[260px] z-10 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right w-[70px] min-w-[70px]">{formatCurrency(totals.totalAmount)}</td>
+                <td className="sticky left-[330px] z-10 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"></td>
 
                 {/* 週別合計 */}
                 {weeks.map((week) => {
@@ -664,9 +822,12 @@ export function InventoryTable() {
                 <td className="border-r border-[#e5e5e5] px-1 py-2 text-right bg-[#2e844a]/20">{formatCurrency(totals.totalAmount)}</td>
                 <td className="border-r border-[#e5e5e5] px-1 py-2 text-right">{formatNumber(totals.currentStock)}</td>
                 <td className="border-r border-[#e5e5e5] px-1 py-2 text-right">{formatCurrency(totals.totalAmount)}</td>
+                <td className="border-r border-[#e5e5e5] px-1 py-2 text-right bg-[#0176d3]/10">-</td>
+                <td className="border-r border-[#e5e5e5] px-1 py-2 text-right bg-[#0176d3]/10">-</td>
                 <td className={`border-r border-[#e5e5e5] px-1 py-2 text-right ${totals.diff !== 0 ? 'text-[#c23934]' : ''}`}>{totals.diff || '-'}</td>
                 <td className="border-r border-[#e5e5e5] px-1 py-2 text-right bg-[#c23934]/20">{formatNumber(totals.shortage)}</td>
                 <td className="border-r border-[#e5e5e5] px-1 py-2 text-right bg-[#c23934]/20">{formatCurrency(totals.orderAmount)}</td>
+                <td className="border-r border-[#e5e5e5] px-1 py-2 text-center bg-[#c23934]/10"></td>
               </tr>
             </tfoot>
           </table>
@@ -694,6 +855,21 @@ export function InventoryTable() {
           </div>
         </div>
       </div>
+
+      {/* 発注書モーダル */}
+      {selectedSupplierForOrder && (
+        <PurchaseOrderModal
+          isOpen={orderModalOpen}
+          onClose={() => {
+            setOrderModalOpen(false);
+            setSelectedSupplierForOrder(null);
+          }}
+          supplierName={selectedSupplierForOrder.supplierName}
+          supplierId={selectedSupplierForOrder.supplierId}
+          items={getOrderItemsForSupplier(selectedSupplierForOrder.supplierId)}
+          onConfirm={handleConfirmOrder}
+        />
+      )}
     </div>
   );
 }
