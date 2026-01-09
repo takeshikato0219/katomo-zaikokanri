@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   Upload,
   FileImage,
@@ -35,6 +35,7 @@ interface ScannedNote {
   id: string;
   fileName: string;
   imageData: string;      // base64
+  imageDataUrl: string;   // data:image/xxx;base64,... 形式（プレビュー用）
   supplierName?: string;  // 仕入先名（推定）
   matchedSupplierId?: string;
   noteDate?: string;      // 納品日
@@ -46,9 +47,13 @@ interface ScannedNote {
   expanded: boolean;
 }
 
-// Google Cloud Vision APIキー設定
-interface VisionApiSettings {
-  apiKey: string;
+// API設定
+type OcrApiType = 'google' | 'openai';
+
+interface ApiSettings {
+  ocrApiType: OcrApiType;
+  googleApiKey: string;
+  openaiApiKey: string;
 }
 
 export function DeliveryNoteScanner() {
@@ -64,27 +69,62 @@ export function DeliveryNoteScanner() {
   const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [operator, setOperator] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState<VisionApiSettings>(() => {
-    const saved = localStorage.getItem('visionApiSettings');
-    return saved ? JSON.parse(saved) : { apiKey: '' };
+  const [isDragging, setIsDragging] = useState(false);
+  const [settings, setSettings] = useState<ApiSettings>(() => {
+    const saved = localStorage.getItem('deliveryNoteScannerSettings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fall through
+      }
+    }
+    // OpenAI APIキーがlocalStorageにあれば使用
+    const openaiKey = localStorage.getItem('openai_api_key') || '';
+    return {
+      ocrApiType: openaiKey ? 'openai' : 'google',
+      googleApiKey: '',
+      openaiApiKey: openaiKey,
+    };
   });
-  const [tempApiKey, setTempApiKey] = useState(settings.apiKey);
+  const [tempSettings, setTempSettings] = useState<ApiSettings>(settings);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   // 設定保存
   const saveSettings = () => {
-    const newSettings = { apiKey: tempApiKey };
-    setSettings(newSettings);
-    localStorage.setItem('visionApiSettings', JSON.stringify(newSettings));
+    setSettings(tempSettings);
+    localStorage.setItem('deliveryNoteScannerSettings', JSON.stringify(tempSettings));
+    // OpenAI APIキーは他の機能でも使うので別途保存
+    if (tempSettings.openaiApiKey) {
+      localStorage.setItem('openai_api_key', tempSettings.openaiApiKey);
+    }
     setShowSettings(false);
   };
 
-  // ファイルアップロード処理
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  // ファイルをBase64に変換
+  const fileToBase64 = (file: File): Promise<{ base64: string; dataUrl: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        // data:image/xxx;base64, の部分を除去
+        const base64 = dataUrl.split(',')[1];
+        resolve({ base64, dataUrl });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
-    if (!settings.apiKey) {
-      alert('Google Cloud Vision APIキーを設定してください');
+  // ファイル処理（共通）
+  const processFiles = useCallback(async (files: FileList | File[]) => {
+    const currentApiKey = settings.ocrApiType === 'google'
+      ? settings.googleApiKey
+      : settings.openaiApiKey;
+
+    if (!currentApiKey) {
+      alert(`${settings.ocrApiType === 'google' ? 'Google Cloud Vision' : 'OpenAI'} APIキーを設定してください`);
       setShowSettings(true);
       return;
     }
@@ -92,14 +132,25 @@ export function DeliveryNoteScanner() {
     // 最大10ファイル
     const fileArray = Array.from(files).slice(0, 10);
 
+    // 画像ファイルのみフィルタ
+    const imageFiles = fileArray.filter(file =>
+      file.type.startsWith('image/') || file.type === 'application/pdf'
+    );
+
+    if (imageFiles.length === 0) {
+      alert('画像ファイルを選択してください');
+      return;
+    }
+
     // 新しいスキャン項目を追加
     const newNotes: ScannedNote[] = await Promise.all(
-      fileArray.map(async (file) => {
-        const imageData = await fileToBase64(file);
+      imageFiles.map(async (file) => {
+        const { base64, dataUrl } = await fileToBase64(file);
         return {
           id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           fileName: file.name,
-          imageData,
+          imageData: base64,
+          imageDataUrl: dataUrl,
           items: [],
           rawText: '',
           status: 'pending' as const,
@@ -112,25 +163,48 @@ export function DeliveryNoteScanner() {
 
     // 順次OCR処理
     processNotesSequentially(newNotes);
+  }, [settings]);
 
+  // ファイルアップロード処理
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    processFiles(files);
     // ファイル入力をリセット
     event.target.value = '';
-  }, [settings.apiKey]);
+  }, [processFiles]);
 
-  // ファイルをBase64に変換
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // data:image/xxx;base64, の部分を除去
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
+  // ドラッグ＆ドロップハンドラー
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // ドロップゾーンから完全に出た場合のみ
+    if (dropZoneRef.current && !dropZoneRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processFiles(files);
+    }
+  }, [processFiles]);
 
   // 順次OCR処理
   const processNotesSequentially = async (notes: ScannedNote[]) => {
@@ -144,7 +218,7 @@ export function DeliveryNoteScanner() {
         );
 
         // OCR実行
-        const result = await performOCR(note.imageData);
+        const result = await performOCR(note.imageData, note.imageDataUrl);
 
         // テキストを解析して商品情報を抽出
         const extracted = parseOCRResult(result);
@@ -180,10 +254,19 @@ export function DeliveryNoteScanner() {
     setIsProcessing(false);
   };
 
+  // OCR実行
+  const performOCR = async (base64Image: string, dataUrl: string): Promise<string> => {
+    if (settings.ocrApiType === 'google') {
+      return performGoogleVisionOCR(base64Image);
+    } else {
+      return performOpenAIOCR(dataUrl);
+    }
+  };
+
   // Google Cloud Vision API呼び出し
-  const performOCR = async (base64Image: string): Promise<string> => {
+  const performGoogleVisionOCR = async (base64Image: string): Promise<string> => {
     const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${settings.apiKey}`,
+      `https://vision.googleapis.com/v1/images:annotate?key=${settings.googleApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -212,7 +295,7 @@ export function DeliveryNoteScanner() {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error?.message || 'API呼び出しに失敗しました');
+      throw new Error(errorData.error?.message || 'Google Vision API呼び出しに失敗しました');
     }
 
     const data = await response.json();
@@ -223,6 +306,63 @@ export function DeliveryNoteScanner() {
     }
 
     return fullText;
+  };
+
+  // OpenAI GPT-4o Vision API呼び出し
+  const performOpenAIOCR = async (dataUrl: string): Promise<string> => {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${settings.openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `この納品書の画像からテキストを読み取ってください。
+以下の情報を抽出してください：
+- 仕入先名/会社名
+- 納品書番号
+- 日付
+- 商品名と数量（すべての商品行）
+
+商品行は以下の形式で出力してください：
+商品名: [商品名] / 数量: [数量]
+
+できるだけ正確に読み取ってください。`,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: dataUrl,
+                  detail: 'high',
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'OpenAI API呼び出しに失敗しました');
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    if (!content) {
+      throw new Error('テキストを検出できませんでした');
+    }
+
+    return content;
   };
 
   // OCR結果を解析して商品情報を抽出
@@ -283,87 +423,83 @@ export function DeliveryNoteScanner() {
     // 商品行を検出して解析
     const items: ExtractedItem[] = [];
 
-    // 数量パターン（例: "10個", "5本", "3", "×10"）
-    const quantityPattern = /[×x]?\s*(\d+)\s*(個|本|枚|箱|セット|kg|g|m|cm|mm)?/gi;
+    // GPT形式の商品行を検出（「商品名: xxx / 数量: yyy」）
+    const gptProductPattern = /商品名[：:]\s*(.+?)\s*[\/|]\s*数量[：:]\s*(\d+)/g;
+    let gptMatch;
+    while ((gptMatch = gptProductPattern.exec(rawText)) !== null) {
+      const productName = gptMatch[1].trim();
+      const quantity = parseInt(gptMatch[2]);
 
-    // 金額パターン（例: "¥1,000", "1000円", "1,000"）
-    const pricePattern = /[¥￥]?\s*([\d,]+)\s*円?/g;
+      if (productName && quantity > 0) {
+        const { matched, matchedProductId, confidence } = matchProduct(productName);
+        items.push({
+          rawText: gptMatch[0],
+          productName,
+          quantity,
+          matched,
+          matchedProductId,
+          confidence,
+        });
+      }
+    }
 
-    for (const line of lines) {
-      // 空行やヘッダー行をスキップ
-      if (line.length < 3) continue;
-      if (/^(品名|商品名|数量|単価|金額|合計|小計|納品書|御中|様|TEL|FAX|〒)/.test(line)) continue;
+    // GPT形式で見つからなかった場合は従来の解析
+    if (items.length === 0) {
+      // 数量パターン（例: "10個", "5本", "3", "×10"）
+      const quantityPattern = /[×x]?\s*(\d+)\s*(個|本|枚|箱|セット|kg|g|m|cm|mm)?/gi;
 
-      // 商品名っぽい行を検出
-      const quantities: number[] = [];
-      let match;
+      // 金額パターン（例: "¥1,000", "1000円", "1,000"）
+      const pricePattern = /[¥￥]?\s*([\d,]+)\s*円?/g;
 
-      while ((match = quantityPattern.exec(line)) !== null) {
-        const qty = parseInt(match[1]);
-        if (qty > 0 && qty < 10000) {
-          quantities.push(qty);
+      for (const line of lines) {
+        // 空行やヘッダー行をスキップ
+        if (line.length < 3) continue;
+        if (/^(品名|商品名|数量|単価|金額|合計|小計|納品書|御中|様|TEL|FAX|〒)/.test(line)) continue;
+
+        // 商品名っぽい行を検出
+        const quantities: number[] = [];
+        let match;
+
+        while ((match = quantityPattern.exec(line)) !== null) {
+          const qty = parseInt(match[1]);
+          if (qty > 0 && qty < 10000) {
+            quantities.push(qty);
+          }
         }
-      }
 
-      if (quantities.length === 0) continue;
+        if (quantities.length === 0) continue;
 
-      // 商品名を推定（数量や金額を除いた部分）
-      let productName = line
-        .replace(quantityPattern, '')
-        .replace(pricePattern, '')
-        .replace(/[¥￥]/g, '')
-        .replace(/[\d,]+/g, ' ')
-        .trim();
+        // 商品名を推定（数量や金額を除いた部分）
+        let productName = line
+          .replace(quantityPattern, '')
+          .replace(pricePattern, '')
+          .replace(/[¥￥]/g, '')
+          .replace(/[\d,]+/g, ' ')
+          .trim();
 
-      if (productName.length < 2) continue;
+        if (productName.length < 2) continue;
 
-      // 単価を検出
-      let unitPrice: number | undefined;
-      const priceMatches = [...line.matchAll(pricePattern)];
-      if (priceMatches.length > 0) {
-        const prices = priceMatches.map((m) => parseInt(m[1].replace(/,/g, '')));
-        // 最小の金額を単価と推定
-        unitPrice = Math.min(...prices);
-      }
-
-      // 既存商品とのマッチング
-      let matched = false;
-      let matchedProductId: string | undefined;
-      let confidence = 30; // 基本信頼度
-
-      // 完全一致を検索
-      const exactMatch = products.find(
-        (p) => p.name === productName || p.id === productName
-      );
-      if (exactMatch) {
-        matched = true;
-        matchedProductId = exactMatch.id;
-        productName = exactMatch.name;
-        confidence = 100;
-      } else {
-        // 部分一致を検索
-        const partialMatch = products.find(
-          (p) =>
-            p.name.includes(productName) ||
-            productName.includes(p.name) ||
-            p.id.includes(productName)
-        );
-        if (partialMatch) {
-          matched = true;
-          matchedProductId = partialMatch.id;
-          confidence = 70;
+        // 単価を検出
+        let unitPrice: number | undefined;
+        const priceMatches = [...line.matchAll(pricePattern)];
+        if (priceMatches.length > 0) {
+          const prices = priceMatches.map((m) => parseInt(m[1].replace(/,/g, '')));
+          // 最小の金額を単価と推定
+          unitPrice = Math.min(...prices);
         }
-      }
 
-      items.push({
-        rawText: line,
-        productName,
-        quantity: quantities[0],
-        unitPrice,
-        matched,
-        matchedProductId,
-        confidence,
-      });
+        const { matched, matchedProductId, confidence } = matchProduct(productName);
+
+        items.push({
+          rawText: line,
+          productName,
+          quantity: quantities[0],
+          unitPrice,
+          matched,
+          matchedProductId,
+          confidence,
+        });
+      }
     }
 
     return {
@@ -373,6 +509,30 @@ export function DeliveryNoteScanner() {
       noteNumber,
       items,
     };
+  };
+
+  // 商品名から既存商品をマッチング
+  const matchProduct = (productName: string): { matched: boolean; matchedProductId?: string; confidence: number } => {
+    // 完全一致を検索
+    const exactMatch = products.find(
+      (p) => p.name === productName || p.id === productName
+    );
+    if (exactMatch) {
+      return { matched: true, matchedProductId: exactMatch.id, confidence: 100 };
+    }
+
+    // 部分一致を検索
+    const partialMatch = products.find(
+      (p) =>
+        p.name.includes(productName) ||
+        productName.includes(p.name) ||
+        p.id.includes(productName)
+    );
+    if (partialMatch) {
+      return { matched: true, matchedProductId: partialMatch.id, confidence: 70 };
+    }
+
+    return { matched: false, confidence: 30 };
   };
 
   // 商品マッチングを手動で変更
@@ -507,7 +667,10 @@ export function DeliveryNoteScanner() {
               />
             </div>
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={() => {
+                setTempSettings(settings);
+                setShowSettings(true);
+              }}
               className="btn-secondary flex items-center space-x-1"
             >
               <Settings className="w-4 h-4" />
@@ -520,43 +683,109 @@ export function DeliveryNoteScanner() {
       {/* API設定モーダル */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="px-4 py-3 border-b border-[#e5e5e5]">
-              <h2 className="text-lg font-bold text-[#181818]">Google Cloud Vision API設定</h2>
+              <h2 className="text-lg font-bold text-[#181818]">OCR API設定</h2>
             </div>
             <div className="p-4 space-y-4">
+              {/* API選択 */}
               <div>
+                <label className="block text-sm font-medium text-[#181818] mb-2">
+                  使用するOCR API
+                </label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ocrApi"
+                      checked={tempSettings.ocrApiType === 'openai'}
+                      onChange={() => setTempSettings({ ...tempSettings, ocrApiType: 'openai' })}
+                      className="w-4 h-4 text-[#0176d3]"
+                    />
+                    <span className="text-sm">OpenAI GPT-4o Vision</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="ocrApi"
+                      checked={tempSettings.ocrApiType === 'google'}
+                      onChange={() => setTempSettings({ ...tempSettings, ocrApiType: 'google' })}
+                      className="w-4 h-4 text-[#0176d3]"
+                    />
+                    <span className="text-sm">Google Cloud Vision</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* OpenAI設定 */}
+              <div className={`p-3 rounded border ${tempSettings.ocrApiType === 'openai' ? 'border-[#0176d3] bg-blue-50/30' : 'border-[#e5e5e5]'}`}>
                 <label className="block text-sm font-medium text-[#181818] mb-1">
-                  APIキー
+                  OpenAI APIキー
+                  {tempSettings.ocrApiType === 'openai' && <span className="text-red-500 ml-1">*</span>}
                 </label>
                 <input
                   type="password"
-                  value={tempApiKey}
-                  onChange={(e) => setTempApiKey(e.target.value)}
+                  value={tempSettings.openaiApiKey}
+                  onChange={(e) => setTempSettings({ ...tempSettings, openaiApiKey: e.target.value })}
+                  placeholder="sk-..."
+                  className="input-field w-full"
+                />
+                <p className="text-xs text-[#706e6b] mt-1">
+                  GPT-4o Visionを使用。高精度な読み取りと構造化が可能
+                </p>
+              </div>
+
+              {/* Google設定 */}
+              <div className={`p-3 rounded border ${tempSettings.ocrApiType === 'google' ? 'border-[#0176d3] bg-blue-50/30' : 'border-[#e5e5e5]'}`}>
+                <label className="block text-sm font-medium text-[#181818] mb-1">
+                  Google Cloud Vision APIキー
+                  {tempSettings.ocrApiType === 'google' && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                <input
+                  type="password"
+                  value={tempSettings.googleApiKey}
+                  onChange={(e) => setTempSettings({ ...tempSettings, googleApiKey: e.target.value })}
                   placeholder="AIza..."
                   className="input-field w-full"
                 />
                 <p className="text-xs text-[#706e6b] mt-1">
-                  Google Cloud Consoleで取得したVision APIキーを入力してください
+                  月1,000回まで無料。日本語認識が高精度
                 </p>
               </div>
-              <div className="bg-[#fef1cd] border border-[#dd7a01]/30 rounded p-3">
-                <p className="text-sm text-[#181818]">
-                  <strong>APIキーの取得方法:</strong>
-                </p>
-                <ol className="text-xs text-[#706e6b] mt-1 list-decimal list-inside space-y-1">
-                  <li>Google Cloud Consoleにアクセス</li>
-                  <li>Vision APIを有効化</li>
-                  <li>認証情報からAPIキーを作成</li>
-                </ol>
+
+              <div className="bg-[#f3f3f3] rounded p-3">
+                <p className="text-sm font-medium text-[#181818] mb-2">API比較</p>
+                <table className="text-xs w-full">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="pb-1"></th>
+                      <th className="pb-1">OpenAI</th>
+                      <th className="pb-1">Google</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[#706e6b]">
+                    <tr>
+                      <td className="py-0.5">精度</td>
+                      <td className="py-0.5">高（構造理解）</td>
+                      <td className="py-0.5">高（文字認識）</td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5">料金</td>
+                      <td className="py-0.5">従量課金</td>
+                      <td className="py-0.5">月1000回無料</td>
+                    </tr>
+                    <tr>
+                      <td className="py-0.5">特徴</td>
+                      <td className="py-0.5">商品行を自動抽出</td>
+                      <td className="py-0.5">生テキスト取得</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
             <div className="px-4 py-3 border-t border-[#e5e5e5] flex justify-end space-x-2">
               <button
-                onClick={() => {
-                  setTempApiKey(settings.apiKey);
-                  setShowSettings(false);
-                }}
+                onClick={() => setShowSettings(false)}
                 className="btn-secondary"
               >
                 キャンセル
@@ -569,37 +798,55 @@ export function DeliveryNoteScanner() {
         </div>
       )}
 
-      {/* アップロードエリア */}
-      <div className="bg-white border-2 border-dashed border-[#c9c9c9] rounded-lg p-8 text-center hover:border-[#0176d3] transition-colors">
+      {/* ドラッグ＆ドロップ アップロードエリア */}
+      <div
+        ref={dropZoneRef}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={() => !isProcessing && fileInputRef.current?.click()}
+        className={`
+          bg-white border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer
+          ${isDragging
+            ? 'border-[#0176d3] bg-blue-50 scale-[1.02]'
+            : 'border-[#c9c9c9] hover:border-[#0176d3]'}
+          ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+        `}
+      >
         <input
+          ref={fileInputRef}
           type="file"
-          id="file-upload"
           multiple
-          accept="image/*,.pdf"
+          accept="image/*"
           onChange={handleFileUpload}
           className="hidden"
           disabled={isProcessing}
         />
-        <label
-          htmlFor="file-upload"
-          className={`cursor-pointer ${isProcessing ? 'opacity-50' : ''}`}
-        >
-          <div className="flex flex-col items-center space-y-4">
-            {isProcessing ? (
-              <Loader2 className="w-12 h-12 text-[#0176d3] animate-spin" />
-            ) : (
-              <Upload className="w-12 h-12 text-[#706e6b]" />
-            )}
-            <div>
-              <p className="text-lg font-medium text-[#181818]">
-                {isProcessing ? 'OCR処理中...' : '納品書をアップロード'}
-              </p>
-              <p className="text-sm text-[#706e6b] mt-1">
-                画像ファイルをドラッグ＆ドロップ、またはクリックして選択（最大10枚）
-              </p>
-            </div>
+        <div className="flex flex-col items-center space-y-4">
+          {isProcessing ? (
+            <Loader2 className="w-12 h-12 text-[#0176d3] animate-spin" />
+          ) : isDragging ? (
+            <Upload className="w-12 h-12 text-[#0176d3] animate-bounce" />
+          ) : (
+            <Upload className="w-12 h-12 text-[#706e6b]" />
+          )}
+          <div>
+            <p className="text-lg font-medium text-[#181818]">
+              {isProcessing
+                ? 'OCR処理中...'
+                : isDragging
+                  ? 'ここにドロップ'
+                  : '納品書をアップロード'}
+            </p>
+            <p className="text-sm text-[#706e6b] mt-1">
+              画像ファイルをドラッグ＆ドロップ、またはクリックして選択（最大10枚）
+            </p>
+            <p className="text-xs text-[#0176d3] mt-2">
+              使用API: {settings.ocrApiType === 'openai' ? 'OpenAI GPT-4o Vision' : 'Google Cloud Vision'}
+            </p>
           </div>
-        </label>
+        </div>
       </div>
 
       {/* スキャン結果一覧 */}
@@ -705,7 +952,7 @@ export function DeliveryNoteScanner() {
                     )}
                     {note.noteNumber && (
                       <span>
-                        <strong>���品書番号:</strong> {note.noteNumber}
+                        <strong>納品書番号:</strong> {note.noteNumber}
                       </span>
                     )}
                   </div>
