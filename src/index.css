@@ -1,0 +1,520 @@
+@import "tailwindcss";
+
+/* Salesforce Lightning Design System - Custom Implementation */
+
+:root {
+  /* SLDS Color Palette */
+  --slds-c-brand: #0176d3;
+  --slds-c-brand-hover: #014486;
+  --slds-c-brand-active: #032d60;
+  --slds-c-background: #f3f3f3;
+  --slds-c-background-alt: #ffffff;
+  --slds-c-border: #c9c9c9;
+  --slds-c-border-light: #e5e5e5;
+  --slds-c-text: #181818;
+  --slds-c-text-weak: #706e6b;
+  --slds-c-text-inverse: #ffffff;
+  --slds-c-success: #2e844a;
+  --slds-c-success-light: #cdefc4;
+  --slds-c-warning: #dd7a01;
+  --slds-c-warning-light: #fef1cd;
+  --slds-c-error: #c23934;
+  --slds-c-error-light: #feded8;
+  --slds-c-info: #0176d3;
+  --slds-c-info-light: #d8edff;
+
+  /* SLDS Typography */
+  font-family: 'Salesforce Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* SLDS Spacing */
+  --slds-spacing-xx-small: 0.25rem;
+  --slds-spacing-x-small: 0.5rem;
+  --slds-spacing-small: 0.75rem;
+  --slds-spacing-medium: 1rem;
+  --slds-spacing-large: 1.5rem;
+  --slds-spacing-x-large: 2rem;
+
+  /* SLDS Border Radius */
+  --slds-radius-border: 0.25rem;
+  --slds-radius-medium: 0.375rem;
+
+  /* SLDS Shadows */
+  --slds-shadow-drop: 0 2px 3px 0 rgba(0, 0, 0, 0.16);
+  --slds-shadow-card: 0 2px 8px 0 rgba(0, 0, 0, 0.1);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--slds-c-background);
+  color: var(--slds-c-text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* SLDS Button - Brand (Primary) */
+.btn-primary {
+  background-color: var(--slds-c-brand);
+  color: var(--slds-c-text-inverse);
+  padding: 0 var(--slds-spacing-medium);
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--slds-c-brand);
+  border-radius: var(--slds-radius-border);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  transition: all 0.1s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-primary:hover {
+  background-color: var(--slds-c-brand-hover);
+  border-color: var(--slds-c-brand-hover);
+}
+.btn-primary:active {
+  background-color: var(--slds-c-brand-active);
+}
+.btn-primary:disabled {
+  background-color: #c9c9c9;
+  border-color: #c9c9c9;
+  cursor: not-allowed;
+}
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 3px var(--slds-c-brand), 0 0 0 1px var(--slds-c-brand);
+}
+
+/* SLDS Button - Neutral (Secondary) */
+.btn-secondary {
+  background-color: var(--slds-c-background-alt);
+  color: var(--slds-c-brand);
+  padding: 0 var(--slds-spacing-medium);
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--slds-c-border);
+  border-radius: var(--slds-radius-border);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  transition: all 0.1s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-secondary:hover {
+  background-color: #f3f3f3;
+}
+.btn-secondary:active {
+  background-color: #e5e5e5;
+}
+.btn-secondary:focus {
+  outline: none;
+  box-shadow: 0 0 3px var(--slds-c-brand);
+}
+
+/* SLDS Button - Destructive (Danger) */
+.btn-danger {
+  background-color: var(--slds-c-error);
+  color: var(--slds-c-text-inverse);
+  padding: 0 var(--slds-spacing-medium);
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--slds-c-error);
+  border-radius: var(--slds-radius-border);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background-color: #a61a14;
+}
+.btn-danger:active {
+  background-color: #8c1510;
+}
+.btn-danger:focus {
+  outline: none;
+  box-shadow: 0 0 3px var(--slds-c-error);
+}
+
+/* SLDS Button - Success */
+.btn-success {
+  background-color: var(--slds-c-success);
+  color: var(--slds-c-text-inverse);
+  padding: 0 var(--slds-spacing-medium);
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--slds-c-success);
+  border-radius: var(--slds-radius-border);
+  font-weight: 400;
+  font-size: 0.8125rem;
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+.btn-success:hover {
+  background-color: #236940;
+}
+.btn-success:focus {
+  outline: none;
+  box-shadow: 0 0 3px var(--slds-c-success);
+}
+
+/* SLDS Input Field */
+.input-field {
+  width: 100%;
+  padding: 0 var(--slds-spacing-small);
+  height: 2rem;
+  border: 1px solid var(--slds-c-border);
+  border-radius: var(--slds-radius-border);
+  background-color: var(--slds-c-background-alt);
+  color: var(--slds-c-text);
+  font-size: 0.8125rem;
+  transition: border-color 0.1s, box-shadow 0.1s;
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--slds-c-brand);
+  box-shadow: 0 0 3px var(--slds-c-brand);
+}
+.input-field::placeholder {
+  color: var(--slds-c-text-weak);
+}
+.input-field:disabled {
+  background-color: #e5e5e5;
+  cursor: not-allowed;
+}
+
+/* SLDS Card */
+.card {
+  background-color: var(--slds-c-background-alt);
+  border: 1px solid var(--slds-c-border-light);
+  border-radius: var(--slds-radius-border);
+  box-shadow: var(--slds-shadow-card);
+  padding: var(--slds-spacing-medium);
+}
+
+/* SLDS Card Header */
+.slds-card__header {
+  padding-bottom: var(--slds-spacing-small);
+  margin-bottom: var(--slds-spacing-medium);
+  border-bottom: 1px solid var(--slds-c-border-light);
+}
+
+/* SLDS Page Header */
+.slds-page-header {
+  background-color: var(--slds-c-background-alt);
+  border-bottom: 1px solid var(--slds-c-border-light);
+  padding: var(--slds-spacing-medium) var(--slds-spacing-large);
+}
+
+/* SLDS Data Table */
+.slds-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.slds-table th {
+  background-color: #fafaf9;
+  border-bottom: 1px solid var(--slds-c-border-light);
+  color: var(--slds-c-text);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  padding: var(--slds-spacing-x-small) var(--slds-spacing-small);
+  text-align: left;
+}
+
+.slds-table td {
+  border-bottom: 1px solid var(--slds-c-border-light);
+  padding: var(--slds-spacing-x-small) var(--slds-spacing-small);
+  vertical-align: middle;
+}
+
+.slds-table tbody tr:hover {
+  background-color: #f3f3f3;
+}
+
+/* SLDS Badge / Pill */
+.slds-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 1rem;
+  white-space: nowrap;
+}
+
+.slds-badge-success {
+  background-color: var(--slds-c-success-light);
+  color: var(--slds-c-success);
+}
+
+.slds-badge-warning {
+  background-color: var(--slds-c-warning-light);
+  color: var(--slds-c-warning);
+}
+
+.slds-badge-error {
+  background-color: var(--slds-c-error-light);
+  color: var(--slds-c-error);
+}
+
+.slds-badge-info {
+  background-color: var(--slds-c-info-light);
+  color: var(--slds-c-info);
+}
+
+/* SLDS Icon Utility */
+.slds-icon {
+  fill: currentColor;
+}
+
+.slds-icon-text-default {
+  color: var(--slds-c-text-weak);
+}
+
+.slds-icon-text-success {
+  color: var(--slds-c-success);
+}
+
+.slds-icon-text-warning {
+  color: var(--slds-c-warning);
+}
+
+.slds-icon-text-error {
+  color: var(--slds-c-error);
+}
+
+/* SLDS Box / Container */
+.slds-box {
+  padding: var(--slds-spacing-medium);
+  border: 1px solid var(--slds-c-border-light);
+  border-radius: var(--slds-radius-border);
+}
+
+.slds-box_x-small {
+  padding: var(--slds-spacing-x-small);
+}
+
+.slds-box_small {
+  padding: var(--slds-spacing-small);
+}
+
+/* SLDS Theme Backgrounds */
+.slds-theme_shade {
+  background-color: #f3f3f3;
+}
+
+.slds-theme_default {
+  background-color: var(--slds-c-background-alt);
+}
+
+.slds-theme_success {
+  background-color: var(--slds-c-success-light);
+}
+
+.slds-theme_warning {
+  background-color: var(--slds-c-warning-light);
+}
+
+.slds-theme_error {
+  background-color: var(--slds-c-error-light);
+}
+
+.slds-theme_info {
+  background-color: var(--slds-c-info-light);
+}
+
+/* SLDS Text Utilities */
+.slds-text-heading_large {
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1.25;
+}
+
+.slds-text-heading_medium {
+  font-size: 1.25rem;
+  font-weight: 300;
+  line-height: 1.25;
+}
+
+.slds-text-heading_small {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.slds-text-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: var(--slds-c-text-weak);
+}
+
+.slds-text-body_regular {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.slds-text-body_small {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* SLDS Alert/Notification */
+.slds-notify {
+  padding: var(--slds-spacing-small) var(--slds-spacing-medium);
+  border-radius: var(--slds-radius-border);
+  display: flex;
+  align-items: center;
+  gap: var(--slds-spacing-small);
+}
+
+.slds-notify_alert {
+  background-color: var(--slds-c-info-light);
+  border: 1px solid var(--slds-c-brand);
+}
+
+.slds-notify_toast {
+  box-shadow: var(--slds-shadow-card);
+}
+
+/* SLDS Progress Bar */
+.slds-progress-bar {
+  height: 0.5rem;
+  background-color: #e5e5e5;
+  border-radius: var(--slds-radius-border);
+  overflow: hidden;
+}
+
+.slds-progress-bar__value {
+  height: 100%;
+  background-color: var(--slds-c-brand);
+  transition: width 0.3s ease;
+}
+
+/* SLDS Vertical Navigation */
+.slds-nav-vertical__item {
+  display: flex;
+  align-items: center;
+  padding: var(--slds-spacing-x-small) var(--slds-spacing-small);
+  color: var(--slds-c-text);
+  text-decoration: none;
+  border-radius: var(--slds-radius-border);
+  transition: background-color 0.1s;
+}
+
+.slds-nav-vertical__item:hover {
+  background-color: #f3f3f3;
+}
+
+.slds-nav-vertical__item.slds-is-active {
+  background-color: #e5e5e5;
+  color: var(--slds-c-brand);
+}
+
+/* SLDS Global Header */
+.slds-global-header {
+  background-color: #032d60;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--slds-spacing-medium);
+}
+
+/* SLDS Stat Tile (for Dashboard KPIs) */
+.slds-stat-tile {
+  padding: var(--slds-spacing-medium);
+  background-color: var(--slds-c-background-alt);
+  border: 1px solid var(--slds-c-border-light);
+  border-radius: var(--slds-radius-border);
+  border-left: 3px solid var(--slds-c-brand);
+}
+
+.slds-stat-tile_success {
+  border-left-color: var(--slds-c-success);
+}
+
+.slds-stat-tile_warning {
+  border-left-color: var(--slds-c-warning);
+}
+
+.slds-stat-tile_error {
+  border-left-color: var(--slds-c-error);
+}
+
+/* SLDS Tab */
+.slds-tabs_default {
+  border-bottom: 1px solid var(--slds-c-border-light);
+}
+
+.slds-tabs__item {
+  padding: var(--slds-spacing-small) var(--slds-spacing-medium);
+  color: var(--slds-c-text);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.slds-tabs__item:hover {
+  color: var(--slds-c-brand);
+}
+
+.slds-tabs__item.slds-is-active {
+  color: var(--slds-c-brand);
+  border-bottom-color: var(--slds-c-brand);
+}
+
+/* SLDS Spinner */
+.slds-spinner {
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid var(--slds-c-border-light);
+  border-top-color: var(--slds-c-brand);
+  border-radius: 50%;
+  animation: slds-spin 0.75s linear infinite;
+}
+
+@keyframes slds-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* SLDS Modal Overlay (utility) */
+.slds-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+}
+
+/* Custom Scrollbar - SLDS Style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f3f3f3;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c9c9c9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #969492;
+}
