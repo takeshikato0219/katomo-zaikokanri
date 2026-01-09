@@ -16,6 +16,7 @@ import { UsageProcessing } from './components/UsageProcessing';
 import { MobileReceiptProcessing } from './components/MobileReceiptProcessing';
 import { MobileUsageProcessing } from './components/MobileUsageProcessing';
 import { ReceiptStockHistory } from './components/ReceiptStockHistory';
+import { DeliveryNoteScanner } from './components/DeliveryNoteScanner';
 import { Login } from './components/Login';
 import type { Page, User } from './types';
 
@@ -92,6 +93,8 @@ function App() {
         return <MobileUsageProcessing />;
       case 'receipt-stock-history':
         return <ReceiptStockHistory />;
+      case 'delivery-note-scanner':
+        return <DeliveryNoteScanner />;
       default:
         return <Dashboard onNavigate={setCurrentPage} />;
     }

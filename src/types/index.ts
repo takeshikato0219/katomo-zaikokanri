@@ -173,7 +173,8 @@ export type Page =
   | 'usage'
   | 'mobile-receipt'
   | 'mobile-usage'
-  | 'receipt-stock-history';
+  | 'receipt-stock-history'
+  | 'delivery-note-scanner';
 
 // ===== AI関連型定義 =====
 

@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   History,
+  ScanLine,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { Page } from '../types';
@@ -33,6 +34,7 @@ const navItems: { page: Page; label: string; icon: React.ComponentType<{ classNa
   { page: 'inventory-table', label: '在庫表', icon: Table },
   { page: 'products', label: '商品一覧', icon: Package },
   { page: 'receipt', label: '入荷', icon: PackagePlus },
+  { page: 'delivery-note-scanner', label: '納品書スキャン', icon: ScanLine },
   { page: 'mobile-receipt', label: '入荷（スマホ）', icon: Smartphone },
   { page: 'usage', label: '使用', icon: PackageMinus },
   { page: 'mobile-usage', label: '使用（スマホ）', icon: Smartphone },

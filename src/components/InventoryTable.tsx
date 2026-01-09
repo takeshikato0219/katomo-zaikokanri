@@ -436,16 +436,16 @@ export function InventoryTable() {
 
       {/* テーブル */}
       <div className="bg-white border border-[#e5e5e5] rounded shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-250px)]">
           <table className="w-full text-xs border-collapse whitespace-nowrap">
-            <thead className="bg-[#fafaf9] sticky top-0 z-10">
+            <thead className="bg-[#fafaf9] sticky top-0 z-20">
               <tr className="border-b border-[#e5e5e5]">
                 {/* 基本情報 - 固定列 */}
-                <th className="sticky left-0 z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold w-[120px] min-w-[120px]">品名</th>
-                <th className="sticky left-[120px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold w-[80px] min-w-[80px]">業者</th>
-                <th className="sticky left-[200px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[60px] min-w-[60px]">当月棚卸</th>
-                <th className="sticky left-[260px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[70px] min-w-[70px]">合計金額</th>
-                <th className="sticky left-[330px] z-20 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">標単価</th>
+                <th className="sticky left-0 top-0 z-30 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold w-[120px] min-w-[120px]">品名</th>
+                <th className="sticky left-[120px] top-0 z-30 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-left font-bold w-[80px] min-w-[80px]">業者</th>
+                <th className="sticky left-[200px] top-0 z-30 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[60px] min-w-[60px]">当月棚卸</th>
+                <th className="sticky left-[260px] top-0 z-30 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[70px] min-w-[70px]">合計金額</th>
+                <th className="sticky left-[330px] top-0 z-30 bg-[#fafaf9] border-r border-[#e5e5e5] px-2 py-2 text-right font-bold w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">標単価</th>
 
                 {/* 週別/日別カラム */}
                 {weeks.map((week) => {
@@ -583,21 +583,41 @@ export function InventoryTable() {
                     {showSupplierHeader && (
                       <tr className="bg-[#032d60]">
                         <td
-                          colSpan={totalColumns}
-                          className="px-3 py-2 text-white font-bold text-sm border-b border-[#032d60]"
+                          className="sticky left-0 z-10 bg-[#032d60] px-3 py-2 text-white font-bold text-sm border-b border-[#032d60] w-[120px] min-w-[120px]"
                         >
                           {data.supplierName}
+                        </td>
+                        <td
+                          className="sticky left-[120px] z-10 bg-[#032d60] px-3 py-2 text-white font-bold text-sm border-b border-[#032d60] w-[80px] min-w-[80px]"
+                        >
+                        </td>
+                        <td
+                          className="sticky left-[200px] z-10 bg-[#032d60] px-3 py-2 text-white font-bold text-sm border-b border-[#032d60] w-[60px] min-w-[60px]"
+                        >
+                        </td>
+                        <td
+                          className="sticky left-[260px] z-10 bg-[#032d60] px-3 py-2 text-white font-bold text-sm border-b border-[#032d60] w-[70px] min-w-[70px]"
+                        >
+                        </td>
+                        <td
+                          className="sticky left-[330px] z-10 bg-[#032d60] px-3 py-2 text-white font-bold text-sm border-b border-[#032d60] w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]"
+                        >
+                        </td>
+                        <td
+                          colSpan={totalColumns - 5}
+                          className="bg-[#032d60] px-3 py-2 text-white font-bold text-sm border-b border-[#032d60]"
+                        >
                         </td>
                       </tr>
                     )}
                     <tr
-                      className={`border-b border-[#e5e5e5] hover:bg-[#f3f3f3] ${isLowStock ? 'bg-[#feded8]/10' : ''}`}
+                      className={`group border-b border-[#e5e5e5] hover:bg-[#f3f3f3] ${isLowStock ? 'bg-[#feded8]/10' : ''}`}
                     >
-                    <td className="sticky left-0 z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 font-medium w-[120px] min-w-[120px]">{data.product.name}</td>
-                    <td className="sticky left-[120px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-[#706e6b] w-[80px] min-w-[80px]">{data.supplierName}</td>
-                    <td className="sticky left-[200px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-right w-[60px] min-w-[60px]">{data.prevMonthStock}</td>
-                    <td className="sticky left-[260px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-right w-[70px] min-w-[70px]">{formatCurrency(data.totalAmount)}</td>
-                    <td className="sticky left-[330px] z-10 bg-white border-r border-[#e5e5e5] px-2 py-1 text-right w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">{formatCurrency(data.product.unitPrice)}</td>
+                    <td className={`sticky left-0 z-10 border-r border-[#e5e5e5] px-2 py-1 font-medium w-[120px] min-w-[120px] ${isLowStock ? 'bg-[#fff5f3]' : 'bg-white'} group-hover:bg-[#f3f3f3]`}>{data.product.name}</td>
+                    <td className={`sticky left-[120px] z-10 border-r border-[#e5e5e5] px-2 py-1 text-[#706e6b] w-[80px] min-w-[80px] ${isLowStock ? 'bg-[#fff5f3]' : 'bg-white'} group-hover:bg-[#f3f3f3]`}>{data.supplierName}</td>
+                    <td className={`sticky left-[200px] z-10 border-r border-[#e5e5e5] px-2 py-1 text-right w-[60px] min-w-[60px] ${isLowStock ? 'bg-[#fff5f3]' : 'bg-white'} group-hover:bg-[#f3f3f3]`}>{data.prevMonthStock}</td>
+                    <td className={`sticky left-[260px] z-10 border-r border-[#e5e5e5] px-2 py-1 text-right w-[70px] min-w-[70px] ${isLowStock ? 'bg-[#fff5f3]' : 'bg-white'} group-hover:bg-[#f3f3f3]`}>{formatCurrency(data.totalAmount)}</td>
+                    <td className={`sticky left-[330px] z-10 border-r border-[#e5e5e5] px-2 py-1 text-right w-[60px] min-w-[60px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isLowStock ? 'bg-[#fff5f3]' : 'bg-white'} group-hover:bg-[#f3f3f3]`}>{formatCurrency(data.product.unitPrice)}</td>
 
                     {/* 週別/日別データ */}
                     {data.weeklyData.map((weekData) => {
